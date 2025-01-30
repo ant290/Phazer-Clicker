@@ -25,6 +25,8 @@ var monsterNameText;
 var monsterHealthText;
 var dmgTextPool;
 var player;
+var playerGoldText;
+var goldCoins;
 
 var monsterData = [
     {name: 'Aerocephal', image: 'aerocephal', maxHealth: 10},
@@ -46,11 +48,16 @@ var monsterData = [
 ];
 
 function preload() {
+    //load backgrounds
     this.load.image('forest-back', 'assets/parallax_forest_pack/layers/parallax-forest-back-trees.png');
     this.load.image('forest-lights', 'assets/parallax_forest_pack/layers/parallax-forest-lights.png');
     this.load.image('forest-front', 'assets/parallax_forest_pack/layers/parallax-forest-front-trees.png');
     this.load.image('forest-middle', 'assets/parallax_forest_pack/layers/parallax-forest-middle-trees.png');
+    
+    //load icons
+    this.load.image('gold_coin', 'assets/496_RPG_icons/I_GoldCoin.png');
 
+    //load monster sprites
     this.load.spritesheet('aerocephal',
         'assets/allacrost_enemy_sprites/aerocephal.png',
         { frameWidth: 192, frameHeight: 192 }
@@ -131,8 +138,25 @@ function create() {
         monsters.add(new Monster(this, 1000, 0, data));
     });
 
+    goldCoins = this.add.container(MONSTER_CONTAINER_X, MONSTER_CONTAINER_Y);
+    for (var d=0; d<50; d++) {
+        var coin = goldCoins.add(new GoldCoin(this, Phaser.Math.Between(150, 350), 100, 1, false));
+    }
+
 
     this.add.text(150, 300, 'Adventure Awaits!', { fontSize: '32px', fill: '#fff'});
+
+    player = {
+        clickDmg: 1,
+        gold: 0
+    };
+
+    playerGoldText = this.add.text(30, 30, 'Gold: ' + player.gold, {
+        font: '24px Arial Black',
+        fill: '#000',
+        strokeThickness: 3,
+        stroke: '#fff'
+    });
 
     currentMonster = monsters.getRandom();
     currentMonster.setPosition(MONSTER_X, MONSTER_Y);
@@ -151,7 +175,7 @@ function create() {
     dmgTextPool = this.add.container(0, 0);
     for (var d=0; d<50; d++) {
         dmgText = this.add.text(0, 0, '1', {
-            font: '64px Arial Black',
+            font: '48px Arial Black',
             fill: '#fff',
             strokeThickness: 4
         });
@@ -162,10 +186,7 @@ function create() {
         dmgTextPool.add(dmgText);
     }
 
-    player = {
-        clickDmg: 1,
-        gold: 0
-    };
+    
 }
 
 function update() {
@@ -208,33 +229,41 @@ class Monster extends Phaser.GameObjects.Sprite{
     }
 
     damage (amount, pointer){
-        var dmgText = dmgTextPool.getFirst('exists', false, 0, 49);
-        dmgText.setText(amount);
-        dmgText.exists = true;
-        dmgText.x = pointer.worldX;
-        dmgText.y = pointer.worldY;
-        dmgText.alpha = 1;
-        dmgText.visible = true;
-
-        var tween = this.scene.tweens.add({
-            targets: dmgText,
-            x: Phaser.Math.Between(MONSTER_CONTAINER_X - MONSTER_X, MONSTER_CONTAINER_X + MONSTER_X),
-            y: Phaser.Math.Between(100, 500),
-            alpha: 0,
-            ease: 'Cubic',
-            duration: 1000,
-            onComplete: function () {
-                dmgText.exists = false;
-            }
-        });
+        
 
         this.health -= amount;
         this.alive = this.health > 0;
 
-        if (this.health < 0){
+        if (this.health < 0) {
             this.onKilled();
         } else {
+            //animate damage text
+            var dmgText = dmgTextPool.getFirst('exists', false, 0, 49);
+            dmgText.setText(amount);
+            dmgText.exists = true;
+            dmgText.x = pointer.worldX;
+            dmgText.y = pointer.worldY;
+            dmgText.alpha = 1;
+            //dmgText.visible = true;
+
+            var tween = this.scene.tweens.add({
+                targets: dmgText,
+                x: Phaser.Math.Between(MONSTER_CONTAINER_X - MONSTER_X, MONSTER_CONTAINER_X + MONSTER_X),
+                y: Phaser.Math.Between(100, 500),
+                alpha: 0,
+                ease: 'Cubic',
+                duration: 1000,
+                onComplete: function () {
+                    dmgText.exists = false;
+                }
+            });
+
             this.onDamaged();
+        }
+        
+        if (this.health === 0) {
+            var coin = goldCoins.getFirst('enabled', false, 0, 49);
+            coin.enable();
         }
     }
 
@@ -244,6 +273,41 @@ class Monster extends Phaser.GameObjects.Sprite{
         } else {
             this.health = this.maxHealth;
         }
+    }
+}
+
+function givePlayerGold(goldValue) {
+    player.gold += goldValue;
+    playerGoldText.setText('Gold: ' + player.gold);
+}
+
+class GoldCoin extends Phaser.GameObjects.Sprite{
+    constructor (scene, x, y, goldVal, enabled) {
+        super(scene, x, y, 'gold_coin');
+        this.enabled = enabled;
+        this.goldValue = goldVal;
+        if (!this.enabled) {
+            this.alpha = 0;
+        }
+
+        this.allowClick = true;
+        this.setInteractive();
+        this.on('pointerdown', () => this.clicked());
+    }
+
+    clicked() {
+        givePlayerGold(this.goldValue);
+        this.disable();
+    }
+
+    enable() {
+        this.enabled = true;
+        this.alpha = 1;
+    }
+
+    disable() {
+        this.enabled = false;
+        this.alpha = 0;
     }
 }
 
